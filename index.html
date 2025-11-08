@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>As Nossas Memórias (Globo Sincronizado)</title>
+    
+    <script src="https://unpkg.com/three"></script>
+    <script src="https://unpkg.com/globe.gl"></script>
+
+    <style>
+        /* --- GERAL --- */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Georgia', 'Times New Roman', Times, serif;
+            overflow: hidden; /* Evita scrollbars */
+        }
+
+        section {
+            width: 100%;
+            height: 100vh;
+            display: none; /* O JS vai controlar o que é mostrado */
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* --- SECÇÃO 1: ECRÃ INICIAL --- */
+        #home {
+            display: flex; /* Começa visível */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .background-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            
+            /* !! EDITA AQUI A FOTO !! 
+             Substitui esta URL pela foto que queres usar 
+            */
+            background-image: url('https://unpkg.com/three-globe@2.31.1/example/img/night-sky.png');
+
+            background-size: cover;
+            background-position: center;
+            z-index: 1;
+        }
+
+        #title-container {
+            position: relative;
+            z-index: 2;
+            padding: 40px 60px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(1px);
+            -webkit-backdrop-filter: blur(1px);
+        }
+
+        #title-container h1 {
+            font-size: 3.5rem;
+            color: white;
+            margin: 0;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+        }
+
+        #title-container h2 {
+            font-size: 1.5rem;
+            color: white;
+            margin: 10px 0 0 0;
+            font-weight: normal;
+            font-style: italic;
+            text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.7);
+        }
+
+        #go-to-map {
+            position: relative;
+            z-index: 2;
+            margin-top: 30px;
+            padding: 12px 25px;
+            font-size: 1rem;
+            font-family: 'Georgia', serif;
+            color: white;
+            background-color: rgba(211, 75, 86, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #go-to-map:hover {
+            background-color: rgba(211, 75, 86, 1);
+            transform: scale(1.05);
+        }
+
+        /* --- SECÇÃO 2: GLOBO 3D --- */
+        #map-section {
+            background-color: #000; /* Fundo preto (atrás das estrelas) */
+        }
+
+        #globe-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        /* O canvas do globo vai preencher o container */
+        #globe-container canvas {
+            display: block;
+        }
+
+        /* Botão de "Adicionar Memória" (hambúrguer) */
+        #add-memory-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: center;
+            padding: 8px 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        #add-memory-btn .bar {
+            width: 24px;
+            height: 3px;
+            background-color: #333;
+            border-radius: 2px;
+        }
+
+        /* Tooltip de ajuda */
+        #tooltip {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        /* O .heart-marker CSS foi REMOVIDO (já não é preciso) */
+
+        /* --- MODAIS (Pop-ups) --- */
+        
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+
+        .modal-box {
+            background-color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-box h3 {
+            margin-top: 0;
+            text-align: center;
+        }
+
+        /* Modal de ADICIONAR */
+        #add-memory-modal label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        #add-memory-modal textarea,
+        #add-memory-modal input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        #add-memory-modal input[type="file"] {
+            padding: 3px;
+        }
+
+        .modal-buttons {
+            margin-top: 25px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .modal-buttons button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+
+        #cancel-memory {
+            background-color: #eee;
+            color: #333;
+        }
+
+        #save-memory {
+            background-color: #d34b56;
+            color: white;
+        }
+
+        /* Modal de VER */
+        #view-memory-modal {
+            text-align: center;
+        }
+
+        #view-memory-photo {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        #view-memory-message {
+            font-size: 1.1rem;
+            font-family: 'Georgia', serif;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        #close-view-modal {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #d34b56;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+    </style>
+</head>
+<body>
+
+    <section id="home">
+        <div class="background-image"></div>
+        <div id="title-container">
+            <h1>As nossas memórias</h1>
+            <h2>Feliz 2 anos e 5 meses ❤️</h2>
+        </div>
+        <button id="go-to-map">Ver o mapa</button>
+    </section>
+
+    <section id="map-section">
+        <div id="globe-container"></div>
+
+        <button id="add-memory-btn">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </button>
+
+        <div id="tooltip">Clica no globo para adicionar uma nova memória</div>
+    </section>
+
+    <div id="add-memory-modal-backdrop" class="modal-backdrop">
+        <div id="add-memory-modal" class="modal-box">
+            <h3>Nova Memória</h3>
+            <label for="memory-message">Mensagem:</label>
+            <textarea id="memory-message" rows="4" placeholder="O que aconteceu aqui?"></textarea>
+            
+            <label for="memory-photo">Foto:</label>
+            <input type="file" id="memory-photo" accept="image/*">
+            
+            <div class="modal-buttons">
+                <button id="cancel-memory">Cancelar</button>
+                <button id="save-memory">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-memory-modal-backdrop" class="modal-backdrop">
+        <div id="view-memory-modal" class="modal-box">
+            <img id="view-memory-photo" src="" alt="Foto da Memória">
+            <p id="view-memory-message">Mensagem de exemplo</p>
+            <button id="close-view-modal">Fechar</button>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- VARIÁVEIS GLOBAIS ---
+            let globe;
+            let memories = []; // Array para guardar todas as memórias
+            let newMemoryLocation = null; // Guarda {lat, lng}
+            let addingMemory = false;
+
+            // --- ELEMENTOS DO DOM ---
+            const homeSection = document.getElementById('home');
+            const mapSection = document.getElementById('map-section');
+            const goToMapBtn = document.getElementById('go-to-map');
+            
+            const globeContainer = document.getElementById('globe-container');
+            const addMemoryBtn = document.getElementById('add-memory-btn');
+            const tooltip = document.getElementById('tooltip');
+            
+            // Modal de Adicionar
+            const addModalBackdrop = document.getElementById('add-memory-modal-backdrop');
+            const saveMemoryBtn = document.getElementById('save-memory');
+            const cancelMemoryBtn = document.getElementById('cancel-memory');
+            const messageInput = document.getElementById('memory-message');
+            const photoInput = document.getElementById('memory-photo');
+
+            // Modal de Ver
+            const viewModalBackdrop = document.getElementById('view-memory-modal-backdrop');
+            const closeViewModalBtn = document.getElementById('close-view-modal');
+            const viewPhoto = document.getElementById('view-memory-photo');
+            const viewMessage = document.getElementById('view-memory-message');
+
+            // --- EVENTOS PRINCIPAIS ---
+
+            // 1. Ir do ecrã inicial para o mapa
+            goToMapBtn.addEventListener('click', () => {
+                homeSection.style.display = 'none';
+                mapSection.style.display = 'block';
+                
+                // Inicializa o globo SÓ na primeira vez
+                if (!globe) {
+                    initGlobe();
+                }
+            });
+
+            // 2. Clicar no botão "Adicionar Memória" (+)
+            addMemoryBtn.addEventListener('click', () => {
+                addingMemory = true;
+                tooltip.style.display = 'block';
+                globeContainer.style.cursor = 'crosshair';
+            });
+
+            // 3. Botões do Modal de Adicionar
+            cancelMemoryBtn.addEventListener('click', closeAddModal);
+            saveMemoryBtn.addEventListener('click', saveMemory);
+
+            // 4. Botão do Modal de Ver
+            closeViewModalBtn.addEventListener('click', () => {
+                viewModalBackdrop.style.display = 'none';
+            });
+
+
+            // --- FUNÇÕES DO GLOBO ---
+
+            /**
+             * Inicializa o globo 3D
+             */
+            function initGlobe() {
+                loadInitialMemories(); // Carrega as memórias primeiro
+
+                // URL dos dados de fronteiras dos países
+                const countriesGeoJsonUrl = 'https://unpkg.com/world-atlas/countries-50m.json';
+
+                globe = Globe()
+                    (document.getElementById('globe-container'))
+                    
+                    // Fundo de estrelas
+                    .backgroundImageUrl('//unpkg.com/three-globe@2.31.1/example/img/night-sky.png')
+                    
+                    // Imagem de base para o MAR (azul escuro com luzes de cidades)
+                    .globeImageUrl('8k_black.jpg')
+
+                    // --- [CORREÇÃO] Usar LABELS em vez de HTML ---
+                    .labelsData(memories) // Usa o mesmo array de memórias
+                    .labelText(() => '❤️') // O texto do label é o coração
+                    .labelSize(1.2)           // Tamanho do coração (podes ajustar)
+                    .labelResolution(4)       // Qualidade/Nitidez do coração
+                    .labelDotRadius(0.4)      // Um pequeno ponto debaixo do coração
+                    .labelColor(() => 'rgba(255, 100, 100, 0.8)') // Cor do ponto
+                    .onLabelClick((d) => {    // Nova função de clique para labels
+                        showMemory(d);
+                    });
+                    // --- Fim da Correção ---
+                
+                // --- Evento de clique NO GLOBO (para adicionar) ---
+                globe.onGlobeClick((coords, e) => {
+                    // Se o clique for num label, o onLabelClick trata,
+                    // mas o onGlobeClick pode disparar também.
+                    // A nossa lógica em showMemory() já previne isto.
+                    
+                    if (!addingMemory) return;
+
+                    newMemoryLocation = { lat: coords.lat, lng: coords.lng };
+                    addModalBackdrop.style.display = 'flex';
+                    addingMemory = false;
+                    tooltip.style.display = 'none';
+                    globeContainer.style.cursor = '';
+                });
+                
+                // Configurações da câmara (mouse)
+                globe.controls().enableZoom = true;
+                globe.controls().autoRotate = true;
+                globe.controls().autoRotateSpeed = 0.1;
+
+                // Cor da atmosfera
+                globe.atmosphereColor('rgba(250,50,0,0.3)');
+            }
+
+            /**
+             * Adiciona um novo marcador ao globo
+             */
+            function addMarkerToGlobe(lat, lng, message, photoUrl) {
+                const newMemory = {
+                    id: Date.now(), // ID único
+                    lat,
+                    lng,
+                    message,
+                    photoUrl
+                };
+                
+                // Adiciona ao array e atualiza o globo
+                memories.push(newMemory);
+                globe.labelsData(memories); // Atualiza os labels
+            }
+
+            /**
+             * Chamado quando um marcador ❤️ (label) é clicado
+             */
+            function showMemory(memoryData) {
+                // Se estivermos em modo de adição, cancela-o
+                // Isto impede que o onGlobeClick faça alguma coisa
+                if (addingMemory) {
+                    addingMemory = false;
+                    tooltip.style.display = 'none';
+                    globeContainer.style.cursor = '';
+                }
+
+                viewMessage.textContent = memoryData.message;
+                if (memoryData.photoUrl) {
+                    viewPhoto.src = memoryData.photoUrl;
+                    viewPhoto.style.display = 'block';
+                } else {
+                    viewPhoto.style.display = 'none';
+                }
+                viewModalBackdrop.style.display = 'flex';
+                
+                // Foca o globo no ponto clicado
+                const altitude = 0.5; 
+                const duration = 1500;
+                globe.pointOfView({ 
+                    lat: memoryData.lat, 
+                    lng: memoryData.lng, 
+                    altitude: altitude 
+                }, duration);
+            }
+
+            /**
+             * Carrega as memórias iniciais (EXEMPLOS)
+             */
+            function loadInitialMemories() {
+                /*
+                 * !! EDITA AQUI AS MEMÓRIAS !!
+                 */
+                memories = [
+                    {
+                        id: 1,
+                        lat: 38.7223, // Lisboa
+                        lng: -9.1393,
+                        message: "Onde a nossa história começou. ❤️",
+                        photoUrl: "https://via.placeholder.com/200x150.png?text=Lisboa" 
+                    },
+                    {
+                        id: 2,
+                        lat: 50.8503, // Bruxelas (Exemplo Erasmus)
+                        lng: 4.3517,
+                        message: "Mesmo longe, estamos perto. Saudades tuas no Erasmus!",
+                        photoUrl: "https://via.placeholder.com/200x150.png?text=Erasmus"
+                    },
+                    {
+                        id: 3,
+                        lat: 41.1579, // Porto
+                        lng: -8.6291,
+                        message: "Aquela escapadinha de fim de semana incrível!",
+                        photoUrl: "https://via.placeholder.com/200x150.png?text=Porto"
+                    }
+                ];
+            }
+
+            /**
+             * Fecha o modal de ADICIONAR e limpa
+             */
+            function closeAddModal() {
+                addModalBackdrop.style.display = 'none';
+                messageInput.value = '';
+                photoInput.value = '';
+                newMemoryLocation = null;
+            }
+
+            /**
+             * Guarda a nova memória vinda do modal
+             */
+            function saveMemory() {
+                const message = messageInput.value;
+                const photoFile = photoInput.files[0];
+
+                if (!message || !newMemoryLocation) {
+                    alert("Por favor, escreve uma mensagem.");
+                    return;
+                }
+
+                if (!photoFile) {
+                    addMarkerToGlobe(newMemoryLocation.lat, newMemoryLocation.lng, message, null);
+                    closeModal();
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const photoUrl = e.target.result;
+                    addMarkerToGlobe(newMemoryLocation.lat, newMemoryLocation.lng, message, photoUrl);
+                    closeAddModal();
+                };
+                reader.readAsDataURL(photoFile);
+            }
+        });
+    </script>
+</body>
+</html>
